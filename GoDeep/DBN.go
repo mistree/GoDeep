@@ -2,7 +2,7 @@
 package GoDeep
 
 import (
-	"fmt"
+	"math/rand"
 )
 
 type DBN struct {
@@ -20,16 +20,15 @@ func NewDBN(Network []int) *DBN {
 
 func (Self *DBN) Train(TrainData *[][]float64, Config Train) float64 {
 	var Activation [][]float64
-
+	var Error float64
 	Activation = *TrainData
-	for i := range Self.RBMLayers {
-		Error := Self.RBMLayers[i].Train(&Activation, Config)
-		fmt.Printf("Layer %d Error %f\r\n", i, Error)
+	for i := 0; i < len(Self.RBMLayers)-1; i++ { // except last layer
+		Error += Self.RBMLayers[i].Train(&Activation, Config)
 		for j := range Activation {
-			Activation[j] = *Self.RBMLayers[i].Forward(&Activation[j])
+			Activation[j] = *Self.RBMLayers[i].RoundForward(&Activation[j])
 		}
 	}
-	return 0.0
+	return Error / float64(len(Self.RBMLayers)-1)
 }
 
 func (Self *DBN) Forward(Input *[]float64) *[]float64 {
@@ -39,6 +38,16 @@ func (Self *DBN) Forward(Input *[]float64) *[]float64 {
 		Activation = *Self.RBMLayers[i].Forward(&Activation)
 	}
 	return &Activation
+}
+
+func AppendLabel(Activation, Label *[][]float64) *[][]float64 {
+	Result := make([][]float64, len(*Activation))
+	LabelNumber := len(*Label)
+	RandomTable := rand.Perm(LabelNumber)
+	for i := range Result {
+		Result[i] = append((*Activation)[i], (*Label)[RandomTable[i%LabelNumber]]...)
+	}
+	return &Result
 }
 
 func (Self *DBN) Feedback(Input *[]float64) *[]float64 {
@@ -78,6 +87,18 @@ func (Self *DBN) ToNN() *NN {
 		for j := range Result.Bias[i] {
 			Result.Bias[i][j] = Self.RBMLayers[i].BiasH[j]
 		}
+	}
+
+	// init last layer randomly
+	for j := range Result.Weight[len(Result.Weight)-1] {
+		for k := range Result.Weight[len(Result.Weight)-1][j] {
+			Result.Weight[len(Result.Weight)-1][j][k] = rand.Float64()*2 - 1
+			//Result.Weight[len(Result.Weight)-1][j][k] = (rand.Float64() - 0.5) * Bound * 2
+		}
+	}
+
+	for j := range Result.Bias[len(Result.Weight)-1] {
+		Result.Bias[len(Result.Weight)-1][j] = 0
 	}
 
 	return Result

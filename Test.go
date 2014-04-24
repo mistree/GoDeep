@@ -10,9 +10,31 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	//NNTest()
 	//RBMTest()
+	//NNTest()
 	DBNTest()
+	//SpeedTest()
+}
+
+func RBMTest() {
+	m := GoDeep.NewRBM(10, 3)
+	var Trainer GoDeep.Train
+	Trainer.Dropout = 0.1
+	Trainer.LearnRate = 1
+	Trainer.Momentum = 0.1
+	Trainer.Epoch = 20000
+	Trainer.ErrorAllowed = 0.1
+	start := time.Now()
+	Error := m.Train(&[][]float64{[]float64{0, 1, 0, 1, 0, 1, 0, 1, 0, 1},
+		[]float64{1, 0, 1, 0, 1, 0, 1, 0, 1, 0},
+		[]float64{1, 1, 1, 1, 1, 0, 0, 0, 0, 0},
+		[]float64{0, 0, 0, 0, 0, 1, 1, 1, 1, 1}}, Trainer)
+	fmt.Printf("RBM Finished training in: %s\r\n", time.Since(start))
+	fmt.Printf("Error %f\r\n", Error)
+	fmt.Println(*m.Feedback(m.Forward(&[]float64{0, 1, 0, 1, 0, 1, 0, 1, 0, 1})))
+	fmt.Println(*m.Feedback(m.Forward(&[]float64{1, 0, 1, 0, 1, 0, 1, 0, 1, 0})))
+	fmt.Println(*m.Feedback(m.Forward(&[]float64{1, 1, 1, 1, 1, 0, 0, 0, 0, 0})))
+	fmt.Println(*m.Feedback(m.Forward(&[]float64{0, 0, 0, 0, 0, 1, 1, 1, 1, 1})))
 }
 
 func NNTest() {
@@ -33,7 +55,7 @@ func NNTest() {
 
 	var Trainer GoDeep.Train
 	Trainer.Dropout = 0
-	Trainer.Epoch = 1000
+	Trainer.Epoch = 5000
 	Trainer.LearnRate = 0.1
 	Trainer.Momentum = 0.1
 	Trainer.ErrorAllowed = 0.1
@@ -45,57 +67,33 @@ func NNTest() {
 	} else {
 		fmt.Printf("Failed, Error %f\r\n", Error)
 	}
-	fmt.Println(*nn.Forward(&inputs[0]))
-	fmt.Println(*nn.Forward(&inputs[1]))
-	fmt.Println(*nn.Forward(&inputs[2]))
-	fmt.Println(*nn.Forward(&inputs[3]))
-}
-
-func RBMTest() {
-	m := GoDeep.NewRBM(2, 4)
-	var Trainer GoDeep.Train
-	Trainer.Dropout = 0.1
-	Trainer.LearnRate = 1
-	Trainer.Momentum = 0.1
-	Trainer.Epoch = 1000
-	Trainer.ErrorAllowed = 0.1
-	start := time.Now()
-	Error := m.Train(&[][]float64{[]float64{0, 0},
-		[]float64{0, 1},
-		[]float64{1, 0},
-		[]float64{1, 1}}, Trainer)
-	fmt.Printf("RBM Finished training in: %s\r\n", time.Since(start))
-	fmt.Printf("Error %f\r\n", Error)
-	fmt.Println(*m.Feedback(m.Forward(&[]float64{0, 0})))
-	fmt.Println(*m.Feedback(m.Forward(&[]float64{0, 1})))
-	fmt.Println(*m.Feedback(m.Forward(&[]float64{1, 0})))
-	fmt.Println(*m.Feedback(m.Forward(&[]float64{1, 1})))
+	fmt.Print(*nn.RoundForward(&inputs[0]))
+	fmt.Print(*nn.RoundForward(&inputs[1]))
+	fmt.Print(*nn.RoundForward(&inputs[2]))
+	fmt.Print(*nn.RoundForward(&inputs[3]))
+	fmt.Println("")
 }
 
 func DBNTest() {
-	d := GoDeep.NewDBN([]int{2, 5, 5, 1})
+	d := GoDeep.NewDBN([]int{2, 10, 10, 1})
 	var Trainer GoDeep.Train
 	Trainer.Dropout = 0.1
 	Trainer.LearnRate = 1
 	Trainer.Momentum = 0.1
-	Trainer.Epoch = 5000
-	Trainer.ErrorAllowed = 0 //.1
+	Trainer.Epoch = 10000
+	Trainer.ErrorAllowed = 0.1
+	start := time.Now()
 	d.Train(&[][]float64{
 		[]float64{0, 0},
 		[]float64{0, 1},
 		[]float64{1, 0},
 		[]float64{1, 1}}, Trainer)
-	fmt.Println("Reconstruction:")
-	fmt.Println(*d.Feedback(d.Forward(&[]float64{0, 0})))
-	fmt.Println(*d.Feedback(d.Forward(&[]float64{0, 1})))
-	fmt.Println(*d.Feedback(d.Forward(&[]float64{1, 0})))
-	fmt.Println(*d.Feedback(d.Forward(&[]float64{1, 1})))
 
 	///*
 	n := d.ToNN()
-	Trainer.Epoch = 1000
-	Trainer.Dropout = 0
-	n.Train(&[][]float64{
+	Trainer.Epoch = 2000
+	Trainer.Dropout = 0.01
+	Error, Succeed := n.Train(&[][]float64{
 		[]float64{0, 0},
 		[]float64{0, 1},
 		[]float64{1, 0},
@@ -105,10 +103,31 @@ func DBNTest() {
 			[]float64{1},
 			[]float64{1},
 			[]float64{0}}, Trainer)
-	fmt.Println("Forward:")
-	fmt.Println(*n.Forward(&[]float64{0, 0}))
-	fmt.Println(*n.Forward(&[]float64{0, 1}))
-	fmt.Println(*n.Forward(&[]float64{1, 0}))
-	fmt.Println(*n.Forward(&[]float64{1, 1}))
+	fmt.Printf("DBN Finished training in: %s\r\n", time.Since(start))
+	if Succeed {
+		fmt.Printf("Succeed, Error %f\r\n", Error)
+	} else {
+		fmt.Printf("Failed, Error %f\r\n", Error)
+	}
+	fmt.Print(*n.RoundForward(&[]float64{0, 0}))
+	fmt.Print(*n.RoundForward(&[]float64{0, 1}))
+	fmt.Print(*n.RoundForward(&[]float64{1, 0}))
+	fmt.Print(*n.RoundForward(&[]float64{1, 1}))
+	fmt.Println("")
 	//*/
+}
+
+func SpeedTest() {
+	start1 := time.Now()
+	for i := 0; i < 100; i++ {
+		NNTest()
+	}
+	end1 := time.Now()
+	start2 := time.Now()
+	for i := 0; i < 100; i++ {
+		DBNTest()
+	}
+	end2 := time.Now()
+	fmt.Printf("NN Finished training in: %s\r\n", end1.Sub(start1))
+	fmt.Printf("DBN Finished training in: %s\r\n", end2.Sub(start2))
 }

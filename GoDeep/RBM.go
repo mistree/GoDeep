@@ -40,7 +40,7 @@ func NewRBM(Visible int, Hidden int) *RBM {
 
 	for i := range m.Weight {
 		for j := range m.Weight[i] {
-			m.Weight[i][j] = float64(1.0 / math.Sqrt(float64(Hidden+Visible)))
+			m.Weight[i][j] = (rand.Float64() - 0.5) * 2 * float64(24.0/math.Sqrt(float64(Hidden+Visible)))
 		}
 	}
 	return m
@@ -206,6 +206,22 @@ func (Self *RBM) Forward(Input *[]float64) *[]float64 {
 			Result[i] += Self.Weight[j][i] * (*Input)[j]
 		}
 		Result[i] = 1 / (1 + math.Exp(-Result[i]-Self.BiasH[i]))
+	}
+	return &Result
+}
+
+func (Self *RBM) RoundForward(Input *[]float64) *[]float64 {
+	Result := make([]float64, len(Self.BiasH))
+	for i := range Result {
+		for j := range *Input {
+			Result[i] += Self.Weight[j][i] * (*Input)[j]
+		}
+		Result[i] = 1 / (1 + math.Exp(-Result[i]-Self.BiasH[i]))
+		if Result[i] > 0.5 {
+			Result[i] = 1
+		} else {
+			Result[i] = 0
+		}
 	}
 	return &Result
 }

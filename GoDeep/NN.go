@@ -43,7 +43,7 @@ func NewNN(Network []int) *NN {
 	return Result
 }
 
-func (Self *NN) Train(TrainData *[][]float64, LableData *[][]float64, Config Train) (float64, bool) {
+func (Self *NN) Train(TrainData *[][]float64, LabelData *[][]float64, Config Train) (float64, bool) {
 	DeltaWeight := make([][][]float64, len(Self.Weight))
 	DeltaBias := make([][]float64, len(Self.Weight))
 
@@ -63,7 +63,7 @@ func (Self *NN) Train(TrainData *[][]float64, LableData *[][]float64, Config Tra
 		RandomTable := rand.Perm(BatchNumber)
 		for i := 0; i < BatchNumber; i++ {
 			go func(Index int) {
-				Batch <- Self._TrainBatch(TrainData, LableData, Config, RandomTable[Index])
+				Batch <- Self._TrainBatch(TrainData, LabelData, Config, RandomTable[Index])
 			}(i)
 		}
 
@@ -118,16 +118,16 @@ func (Self *NN) Train(TrainData *[][]float64, LableData *[][]float64, Config Tra
 		<-Finish
 		Self.DeltaWeight = DeltaWeight
 
-		Error := Self.Error(TrainData, LableData)
+		Error := Self.Error(TrainData, LabelData)
 		if Error <= Config.ErrorAllowed {
 			return Error, true
 		}
 	}
-	Error := Self.Error(TrainData, LableData)
+	Error := Self.Error(TrainData, LabelData)
 	return Error, false
 }
 
-func (Self *NN) _TrainBatch(TrainData *[][]float64, LableData *[][]float64, Config Train, Index int) *_NNBatch {
+func (Self *NN) _TrainBatch(TrainData *[][]float64, LabelData *[][]float64, Config Train, Index int) *_NNBatch {
 	Activation := make([][]float64, len(Self.Weight)+1)
 	DropoutMask := make([][]float64, len(Self.Weight)+1)
 	Error := make([][]float64, len(Self.Weight)+1)
@@ -178,7 +178,7 @@ func (Self *NN) _TrainBatch(TrainData *[][]float64, LableData *[][]float64, Conf
 
 	// 2 cal output Error
 	for k := len(Error[len(Error)-1]) - 1; k >= 0; k-- {
-		Error[len(Error)-1][k] = -Activation[len(Error)-1][k] * (1.0 - Activation[len(Error)-1][k]) * ((*LableData)[Index][k] - Activation[len(Error)-1][k])
+		Error[len(Error)-1][k] = -Activation[len(Error)-1][k] * (1.0 - Activation[len(Error)-1][k]) * ((*LabelData)[Index][k] - Activation[len(Error)-1][k])
 	}
 
 	// 3 cal error feedback
@@ -212,12 +212,12 @@ func (Self *NN) _TrainBatch(TrainData *[][]float64, LableData *[][]float64, Conf
 	return &_NNBatch{DeltaWeight, DeltaBias}
 }
 
-func (Self *NN) Error(TrainData *[][]float64, LableData *[][]float64) float64 {
+func (Self *NN) Error(TrainData *[][]float64, LabelData *[][]float64) float64 {
 	var Error float64
 	for i := range *TrainData {
 		Result := Self.Forward(&(*TrainData)[i])
 		for j := range *Result {
-			Error += math.Abs((*Result)[j] - (*LableData)[i][j])
+			Error += math.Abs((*Result)[j] - (*LabelData)[i][j])
 		}
 	}
 	Error /= float64(len(*TrainData))
@@ -238,6 +238,33 @@ func (Self *NN) Forward(InputData *[]float64) *[]float64 {
 				Activation[k+1][l] += Activation[k][n] * Self.Weight[k][n][l]
 			}
 			Activation[k+1][l] = 1 / (1 + math.Exp(-Activation[k+1][l]-Self.Bias[k][l]))
+		}
+	}
+	return &Activation[len(Self.Weight)]
+}
+
+func (Self *NN) RoundForward(InputData *[]float64) *[]float64 {
+	Activation := make([][]float64, len(Self.Weight)+1)
+	for i := range Self.Weight {
+		Activation[i] = make([]float64, len(Self.Weight[i]))
+	}
+	Activation[len(Self.Weight)] = make([]float64, len(Self.Weight[len(Self.Weight)-1][0]))
+
+	Activation[0] = *InputData
+	for k := range Self.Weight {
+		for l := range Activation[k+1] {
+			for n := range Activation[k] {
+				Activation[k+1][l] += Activation[k][n] * Self.Weight[k][n][l]
+			}
+			Activation[k+1][l] = 1 / (1 + math.Exp(-Activation[k+1][l]-Self.Bias[k][l]))
+		}
+	}
+
+	for i := range Activation[len(Self.Weight)] {
+		if Activation[len(Self.Weight)][i] > 0.5 {
+			Activation[len(Self.Weight)][i] = 1
+		} else {
+			Activation[len(Self.Weight)][i] = 0
 		}
 	}
 	return &Activation[len(Self.Weight)]
