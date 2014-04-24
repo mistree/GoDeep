@@ -129,15 +129,18 @@ func (Self *NN) Train(TrainData *[][]float64, LableData *[][]float64, Config Tra
 
 func (Self *NN) _TrainBatch(TrainData *[][]float64, LableData *[][]float64, Config Train, Index int) *_NNBatch {
 	Activation := make([][]float64, len(Self.Weight)+1)
+	DropoutMask := make([][]float64, len(Self.Weight)+1)
 	Error := make([][]float64, len(Self.Weight)+1)
 	DeltaWeight := make([][][]float64, len(Self.Weight))
 	DeltaBias := make([][]float64, len(Self.Weight))
 
 	for i := range DeltaWeight {
 		Activation[i] = make([]float64, len(Self.Weight[i]))
+		DropoutMask[i] = make([]float64, len(Self.Weight[i]))
 		Error[i] = make([]float64, len(Self.Weight[i]))
 	}
 	Activation[len(Self.Weight)] = make([]float64, len(Self.Weight[len(Self.Weight)-1][0]))
+	DropoutMask[len(Self.Weight)] = make([]float64, len(Self.Weight[len(Self.Weight)-1][0]))
 	Error[len(Self.Weight)] = make([]float64, len(Self.Weight[len(Self.Weight)-1][0]))
 
 	for i := 0; i < len(Self.Weight)-1; i++ {
@@ -147,6 +150,17 @@ func (Self *NN) _TrainBatch(TrainData *[][]float64, LableData *[][]float64, Conf
 	DeltaBias[len(Self.Weight)-1] = make([]float64, len(Self.Weight[len(Self.Weight)-1][0]))
 	DeltaWeight[len(Self.Weight)-1] = NewMatrix(len(Self.Weight[len(Self.Weight)-1]), len(Self.Weight[len(Self.Weight)-1][0]))
 
+	// 0 cal Dropout mask matrix
+	for k := range DropoutMask {
+		for l := range DropoutMask[k] {
+			if rand.Float64() < Config.Dropout {
+				DropoutMask[k][l] = 0
+			} else {
+				DropoutMask[k][l] = 1
+			}
+		}
+	}
+
 	// 1 cal activation with bias for each layer
 	Activation[0] = (*TrainData)[Index]
 	for k := range Self.Weight {
@@ -154,7 +168,7 @@ func (Self *NN) _TrainBatch(TrainData *[][]float64, LableData *[][]float64, Conf
 			for n := range Activation[k] {
 				Activation[k+1][l] += Activation[k][n] * Self.Weight[k][n][l]
 			}
-			if rand.Float64() < Config.Dropout {
+			if DropoutMask[k+1][l] == 0 && (k+1 != len(Self.Weight)) {
 				Activation[k+1][l] = 0
 			} else {
 				Activation[k+1][l] = 1 / (1 + math.Exp(-Activation[k+1][l]-Self.Bias[k][l]))
@@ -181,7 +195,11 @@ func (Self *NN) _TrainBatch(TrainData *[][]float64, LableData *[][]float64, Conf
 	for k := range DeltaWeight {
 		for l := range Activation[k] {
 			for n := range Error[k+1] {
-				DeltaWeight[k][l][n] = Error[k+1][n] * Activation[k][l]
+				if DropoutMask[k][l] == 0 && (k != len(Self.Weight)) {
+					DeltaWeight[k][l][n] = 0
+				} else {
+					DeltaWeight[k][l][n] = Error[k+1][n] * Activation[k][l]
+				}
 			}
 		}
 	}

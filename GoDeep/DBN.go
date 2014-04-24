@@ -73,10 +73,12 @@ func (Self *DBN) ToNN() *NN {
 			}
 		}
 	}
+
 	for i := range Result.Bias {
 		for j := range Result.Bias[i] {
 			Result.Bias[i][j] = Self.RBMLayers[i].BiasH[j]
 		}
 	}
+
 	return Result
 }
